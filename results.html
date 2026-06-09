@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flood Damage Assessment Results</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f5f6fa; color: #222; padding: 20px; font-size: 13px; }
+h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.subtitle { color: #666; font-size: 0.85rem; margin-bottom: 18px; }
+
+.summary { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.stat { background: #fff; border-radius: 8px; padding: 10px 18px;
+         box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center; min-width: 100px; }
+.stat .n { font-size: 1.7rem; font-weight: 700; color: #1a73e8; }
+.stat .label { font-size: 0.7rem; color: #666; }
+
+.toolbar { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.color-section label.section-label,
+.col-section label.section-label { font-size: 0.78rem; font-weight: 700; color: #444;
+                                     display: block; margin-bottom: 6px; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.toggle-btn { padding: 4px 13px; border: 2px solid #ddd; border-radius: 20px;
+               background: #fff; cursor: pointer; font-size: 0.75rem; transition: all .15s; }
+.toggle-btn.active { border-color: #1a73e8; background: #1a73e8; color: #fff; }
+.toggle-btn:hover:not(.active) { border-color: #888; }
+
+.col-picker { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 600px; }
+.col-check { display: flex; align-items: center; gap: 4px; font-size: 0.75rem;
+              cursor: pointer; user-select: none; }
+.col-check input { cursor: pointer; }
+
+.filter-bar { margin-bottom: 10px; }
+.filter-bar input { padding: 5px 11px; border: 1px solid #ddd; border-radius: 6px;
+                     font-size: 0.78rem; width: 240px; }
+
+.legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 0.72rem; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+
+/* Always-visible scrollbar */
+.table-wrap { overflow-x: scroll; border-radius: 10px;
+               box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+table { border-collapse: collapse; background: #fff; font-size: 0.78rem; white-space: nowrap; }
+thead th { background: #1f4e79; color: #fff; padding: 8px 10px; text-align: left;
+            font-size: 0.72rem; font-weight: 600; position: sticky; top: 0; z-index: 2; }
+tbody tr { border-bottom: 1px solid #eee; transition: background .1s; }
+tbody tr:hover { filter: brightness(0.95); }
+td { padding: 7px 10px; vertical-align: top; }
+.thumb { width: 68px; height: 50px; object-fit: cover; border-radius: 4px; display: block; }
+.fname { display: inline-block; max-width: 140px; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; color: #888; font-size: 0.7rem;
+          vertical-align: middle; }
+.long { display: inline-block; max-width: 260px; white-space: normal;
+         line-height: 1.4; font-size: 0.76rem; }
+.model { color: #aaa; font-size: 0.7rem; }
+.pill { display: inline-block; padding: 2px 7px; border-radius: 4px;
+         font-size: 0.72rem; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Montpelier Flood — Damage Assessment Baseline</h1>
+<p class="subtitle">Model: claude-sonnet-4-6 &nbsp;·&nbsp; 29 images processed</p>
+
+<div class="summary">
+  <div class="stat"><div class="n">29</div><div class="label">Total images</div></div>
+  <div class="stat"><div class="n">20</div><div class="label">Assessable</div></div>
+  <div class="stat"><div class="n">15</div><div class="label">Excel matches</div></div>
+  <div class="stat"><div class="n">9</div><div class="label">Flagged</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="color-section">
+    <label class="section-label">Color rows by</label>
+    <div class="btn-group">
+      <button class="toggle-btn active" onclick="setMode('none',this)">None</button>
+      <button class="toggle-btn" onclick="setMode('ds',this)">Damage State</button>
+      <button class="toggle-btn" onclick="setMode('cf',this)">Confidence</button>
+    </div>
+  </div>
+  <div class="col-section">
+    <label class="section-label">Columns</label>
+    <div class="col-picker">
+<label class="col-check"><input type="checkbox" data-col="0" checked onchange="toggleCol(0,this.checked)"> Image</label>
+<label class="col-check"><input type="checkbox" data-col="1"  onchange="toggleCol(1,this.checked)"> File</label>
+<label class="col-check"><input type="checkbox" data-col="2"  onchange="toggleCol(2,this.checked)"> Building</label>
+<label class="col-check"><input type="checkbox" data-col="3" checked onchange="toggleCol(3,this.checked)"> Address (Claude)</label>
+<label class="col-check"><input type="checkbox" data-col="4" checked onchange="toggleCol(4,this.checked)"> Damage State</label>
+<label class="col-check"><input type="checkbox" data-col="5"  onchange="toggleCol(5,this.checked)"> Confidence</label>
+<label class="col-check"><input type="checkbox" data-col="6" checked onchange="toggleCol(6,this.checked)"> Water Depth</label>
+<label class="col-check"><input type="checkbox" data-col="7"  onchange="toggleCol(7,this.checked)"> Image Type</label>
+<label class="col-check"><input type="checkbox" data-col="8" checked onchange="toggleCol(8,this.checked)"> Assessable</label>
+<label class="col-check"><input type="checkbox" data-col="9" checked onchange="toggleCol(9,this.checked)"> Rationale</label>
+<label class="col-check"><input type="checkbox" data-col="10" checked onchange="toggleCol(10,this.checked)"> Caveats</label>
+<label class="col-check"><input type="checkbox" data-col="11"  onchange="toggleCol(11,this.checked)"> Matched Address</label>
+<label class="col-check"><input type="checkbox" data-col="12"  onchange="toggleCol(12,this.checked)"> Model</label>
+    </div>
+  </div>
+</div>
+
+<div class="legend" id="legend" style="display:none"></div>
+
+<div class="filter-bar">
+  <input type="text" id="filter" placeholder="Filter by address, building, damage state…" oninput="filterRows()">
+</div>
+
+<div class="table-wrap">
+<table id="results-table">
+<thead><tr>
+    <th data-col="0">Image</th>
+    <th data-col="1" style="display:none">File</th>
+    <th data-col="2" style="display:none">Building</th>
+    <th data-col="3">Address (Claude)</th>
+    <th data-col="4">Damage State</th>
+    <th data-col="5" style="display:none">Confidence</th>
+    <th data-col="6">Water Depth</th>
+    <th data-col="7" style="display:none">Image Type</th>
+    <th data-col="8">Assessable</th>
+    <th data-col="9">Rationale</th>
+    <th data-col="10">Caveats</th>
+    <th data-col="11" style="display:none">Matched Address</th>
+    <th data-col="12" style="display:none">Model</th>
+</tr></thead>
+<tbody>
+<tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/Capitol%20Building%202.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Capitol Building 2.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">—</td>
+  <td data-col="7">—</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long"></span></td>
+  <td data-col="10"><span class="long"></span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model"></span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/Capitol%20Building.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Capitol Building.png</span></td>
+  <td data-col="2">Vermont State Capitol area / Montpelier downtown district</td>
+  <td data-col="3">115 State Street, Montpelier, VT 05633</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">4.0 ft</td>
+  <td data-col="7">aerial_overview</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">This aerial image shows widespread flooding across downtown Montpelier including the Vermont State Capitol (gold dome visible upper right), the Vermont Supreme Court/Office Building (large white neoclassical building center), and numerous smaller commercial and residential structures along what appears to be State Street and the Winooski River corridor; floodwater is visibly inundating streets, parking lots, and ground floors across the entire scene with brown turbid water covering the area to an estimated depth of 3–5 feet at street level based on submersion of vehicles, lower tree trunks, and first-floor building elements.</span></td>
+  <td data-col="10"><span class="long">Aerial overview precludes individual building-level damage state assignment; no single structure is the clear subject; water depth is estimated from partial submersion of trees and lower building features at oblique aerial angle; interior conditions, drywall, electrical, and structural damage cannot be assessed from this vantage point; multiple buildings at varying elevations are visible making a single damage state inapplicable.</span></td>
+  <td data-col="11">115 State St, Montpelier, VT 05633</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Capitol%20plaza%20hotel.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Capitol plaza hotel.png</span></td>
+  <td data-col="2">Capitol Plaza Hotel</td>
+  <td data-col="3">100 State Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">The image shows active flooding in the parking lot adjacent to the Capitol Plaza Hotel (sign visible upper right, gold-domed Vermont State House visible in background), with water depth estimated at 3–4 feet based on cars being submerged to hood/roof level. Water appears to be reaching the ground-floor level of the hotel building, suggesting potential intrusion into basement and first-floor commercial spaces consistent with moderate (DS2) damage.</span></td>
+  <td data-col="10"><span class="long">Assessment is based on exterior view only during active flood; interior conditions unknown. Water depth at building foundation may differ from parking lot depth. First-floor damage extent cannot be confirmed without interior inspection. Image angle is oblique and does not show all building facades.</span></td>
+  <td data-col="11">100 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Fire%20and%20Ambulance%20Department.jpg" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Fire and Ambulance Department.jpg</span></td>
+  <td data-col="2">Montpelier Fire Department</td>
+  <td data-col="3">45 State Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Signage clearly reads 'Montpelier Fire Department'; floodwater is actively surrounding the building at approximately 2–3 feet depth at the exterior, submerging the base of the entrance ramp and railings, suggesting water has reached or is near first-floor level and likely entered the ground-floor apparatus bay and administrative spaces, causing damage consistent with moderate (DS2) — threatening water heater, lower electrical, and first-floor contents.</span></td>
+  <td data-col="10"><span class="long">Exterior-only assessment during active flooding; interior damage unknown; apparatus bay doors not visible in frame so entry of water into bay is inferred but not confirmed; actual interior water depth may differ from exterior; upper floors appear undamaged based on visible windows.</span></td>
+  <td data-col="11">45 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Main%20St%203.jpg" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Main St 3.jpg</span></td>
+  <td data-col="2">Capital Cannabis Co. / Aromed Essentials / DLC / Alpe Glow block</td>
+  <td data-col="3">Main Street, Montpelier, VT (100 block, State Street intersection area)</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at or above ground-floor storefront thresholds — approximately mid-door height on the commercial facades — indicating water has entered the first floor well above the floor slab, reaching an estimated 2–3 ft at the building face; this level would cause complete damage to first-floor flooring, lower cabinetry, base electrical outlets, water heater/HVAC, and all ground-floor merchandise/furniture consistent with DS-2.</span></td>
+  <td data-col="10"><span class="long">Exterior view only during active flood; interior conditions unknown; actual water depth at building face may differ from street centerline depth visible in foreground; upper stories appear unaffected; final damage state could shift to DS-3 if water rose further or sewer backup occurred.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Main%20St%204.jpg" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Main St 4.jpg</span></td>
+  <td data-col="2">Spirits & Espresso (left foreground building)</td>
+  <td data-col="3">Main Street, Montpelier, VT (near State Street intersection)</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at approximately 2–3 feet depth across the intersection, with water appearing to enter ground-floor commercial spaces; the water line on the buildings and submerged street furniture (trash cans, benches) indicate depth sufficient to damage base electrical outlets, lower cabinetry, flooring, and first-floor appliances. Route 2/12 signage and the souvenir shop mural confirm this is the Main/State Street intersection in downtown Montpelier.</span></td>
+  <td data-col="10"><span class="long">Exterior street-level view only; interior damage cannot be confirmed. Water depth is estimated relative to submerged parking meters and street signs. Multiple buildings are visible but no single structure dominates the frame; assessment focuses on the Spirits & Espresso building on the left. Flood is ongoing so peak depth may not yet have been reached.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/Main%20St%20looking%20down%20State%20st.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Main St looking down State st.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">Main Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">aerial_overview</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">This is an aerial overview of downtown Montpelier VT during the July 2023 flood, identifiable by the Vermont State House gold dome visible in the background. Floodwater covers all streets and sidewalks throughout the downtown core, with brown turbid water visibly reaching first-floor window levels on multiple commercial brick buildings along Main Street.</span></td>
+  <td data-col="10"><span class="long">Pure aerial overview — no single building is the clear subject of assessment. Water depth estimate is approximate based on street-level and first-floor window inundation visible across multiple structures. Individual building damage states cannot be reliably assigned from this oblique angle; interior conditions, drywall damage, and mechanical systems are not visible. A kayaker visible in foreground provides rough human-scale reference for water depth estimate.</span></td>
+  <td data-col="11">2 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Main%20St-%20VT-12%20street.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Main St- VT-12 street.png</span></td>
+  <td data-col="2">Montpelier City Hall / Washington County Courthouse area, State Street commercial district</td>
+  <td data-col="3">State Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">This is a street-level view of State Street in downtown Montpelier during active flooding, with water approximately 2–3 feet deep covering the entire roadway and reaching into storefronts; the Montpelier City Hall clock tower is clearly visible on the right, and a marquee reading 'Asteroid City' is visible on the left (Palace 9 Cinemas area). Water appears to be at or above first-floor threshold level for most ground-floor commercial spaces, consistent with Damage State 2 (partial drywall, base electrical, appliance damage).</span></td>
+  <td data-col="10"><span class="long">This is a street-level overview image covering multiple buildings simultaneously; no single building is the clear subject, making individual building assessment unreliable. Water depth is estimated relative to street furniture (lamp posts, signage) and building thresholds. Interior conditions are not visible. The 'July 3rd Alive' banners confirm this is the July 2023 Montpelier flood event.</span></td>
+  <td data-col="11">5 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Main%20St.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Main St.png</span></td>
+  <td data-col="2">Capitol Copy</td>
+  <td data-col="3">100 Main Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly entering Capitol Copy and adjacent storefronts at approximately 3–4 feet above street grade, as evidenced by the submerged sedan (only roof visible) and water reaching mid-door-frame height on storefronts; this level strongly implies inundation of first-floor interiors well above floor joists, threatening base electrical outlets, lower cabinets, appliances, and drywall up to roughly 2–3 feet inside. Aubuchon Hardware signage is also visible to the right, confirming the Main Street commercial block.</span></td>
+  <td data-col="10"><span class="long">Assessment is exterior-only during active flood; actual interior water depth may differ from street depth due to threshold/step elevation. Upper floors appear unaffected. Final damage state depends on flood duration and whether water receded quickly. Street-level vs. finished-floor elevation unknown.</span></td>
+  <td data-col="11">100 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221658.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221658.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">Main Street or Barre Street, Montpelier VT (exact address indeterminate)</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">—</td>
+  <td data-col="7">post_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Post-flood debris removal is clearly underway along an entire residential block, with large piles of destroyed drywall, cabinetry, furniture, flooring, and black trash bags lining the curb in front of multiple Victorian-era homes, consistent with moderate flood damage including first-floor interior gut-outs reaching drywall and appliance levels.</span></td>
+  <td data-col="10"><span class="long">Image is post-flood with no visible water line on structures; assessment is inferred from debris type and volume rather than direct watermark evidence; multiple buildings are visible but no single structure is the definitive focal subject; no legible address numbers or street signs are visible.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221716.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221716.png</span></td>
+  <td data-col="2">Montpelier City Hall / Downtown Montpelier Main Street corridor</td>
+  <td data-col="3">Main Street at Langdon Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">The 'Langdon St' street sign is clearly visible confirming the Main Street/Langdon Street intersection in downtown Montpelier; floodwater appears to be approximately 2–3 feet deep at street level, submerging storefronts up to or near their lower door frames, indicating water is likely entering first-floor commercial spaces at a depth consistent with moderate damage (drywall, lower cabinets, appliances, flooring all at risk). The small white kiosk structure at left appears nearly fully inundated to its roofline.</span></td>
+  <td data-col="10"><span class="long">Street-level exterior view only during active flooding; interior damage cannot be confirmed; final water height on building interiors depends on finished floor elevation relative to street grade, which may differ; multiple buildings visible but none individually assessable with high precision from this oblique angle.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221740.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221740.png</span></td>
+  <td data-col="2">Capitol Copy</td>
+  <td data-col="3">historically known to be on State Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">4.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at approximately 4–5 feet at the building exteriors, with water at or above the top of storefront door frames and base of display windows at Capitol Copy and Aubuchon Hardware; a submerged car with only the roof exposed confirms extreme depth, suggesting water has fully inundated first-floor commercial interiors, destroying flooring, lower cabinetry, appliances, base electrical, and likely causing partial drywall damage consistent with a Damage State 2.</span></td>
+  <td data-col="10"><span class="long">Assessment is exterior-only during active flooding; interior conditions are inferred from water depth; upper stories appear unaffected; final damage state could rise to 3 if interior water depth caused mid-wall drywall saturation or upper-story damage; signage identifies Capitol Copy but exact street address number not visible.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fff3cd" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221756.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221756.png</span></td>
+  <td data-col="2">TD Bank</td>
+  <td data-col="3">100 State Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fff3cd">DS 1 — Minor</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">0.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is present in the street/sidewalk area at approximately ankle-to-shin depth on pedestrians (roughly 0.5 ft), but water does not appear to have breached the building's entrance threshold visibly; the TD Bank signage is clearly visible and the brick facade shows no high waterline staining indicative of interior inundation above floor level, suggesting at most minor water entry at the ground floor threshold.</span></td>
+  <td data-col="10"><span class="long">Exterior-only assessment; interior damage to flooring, baseboards, and lower cabinets cannot be confirmed from this angle. Water may have entered the building even if not clearly visible at this vantage point. Receding vs. peak flood stage unknown. Damage state could be upgraded to 2 if interior inundation reached drywall height.</span></td>
+  <td data-col="11">100 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221819.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221819.png</span></td>
+  <td data-col="2">TD Bank</td>
+  <td data-col="3">100 State Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">The TD Bank building at the prominent corner shows floodwater at approximately 2–3 feet depth at the exterior, with water visibly entering through the glass storefront doors and lower facade columns; the interior first floor appears inundated, suggesting damage to flooring, lower electrical outlets, and first-floor fixtures consistent with a moderate (DS2) assessment. The Route 2 West Business sign and 'No Turn on Red' signage help confirm this is the Main/State Street intersection in Montpelier.</span></td>
+  <td data-col="10"><span class="long">Exterior view only during active flooding; interior damage extent cannot be directly confirmed. Water may have receded or risen after this photo was taken. Upper floors not assessable. Parking meters partially submerged provide a secondary depth reference but exact grade elevation is unknown.</span></td>
+  <td data-col="11">100 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221829.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221829.png</span></td>
+  <td data-col="2">Marigold Adornment Tattoo (right foreground); mixed commercial block on Main Street</td>
+  <td data-col="3">Main Street at State Street intersection, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at approximately 3–4 feet depth at street level, submerging the base of storefronts, doorways, and steps of the brick commercial buildings on Main Street; water appears to reach well above door thresholds and ground-floor window sills, indicating interior inundation sufficient to destroy flooring, base electrical, lower cabinets, and first-floor appliances. The 'Main St' street sign and 'Marigold Adornment Tattoo' signage confirm the intersection of Main and State Streets in downtown Montpelier.</span></td>
+  <td data-col="10"><span class="long">Exterior assessment only during active flooding; interior damage cannot be directly observed. Upper stories appear unaffected visually. Actual water depth inside buildings may differ from street depth depending on building slab/threshold elevation. No visible structural collapse or wall damage from this angle.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20221856.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 221856.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly entering ground-floor commercial storefronts on both sides of the street, with water depth estimated at approximately 2–3 feet at the building facades, reaching above door thresholds and likely inundating lower interior spaces including flooring, base electrical outlets, and first-floor contents. The turbid brown water and depth suggest interior penetration consistent with moderate damage to drywall, appliances, and lower cabinets.</span></td>
+  <td data-col="10"><span class="long">Street-level exterior view only; no interior visibility, no readable signage or address numbers to confirm location; water depth is estimated relative to door/storefront proportions; this appears consistent with downtown Montpelier VT but cannot be confirmed without signage; image may be AI-generated or illustrative rather than a verified documentary photograph.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f8d7da" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222004.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222004.png</span></td>
+  <td data-col="2">Kellogg-Hubbard Library (probable)</td>
+  <td data-col="3">135 Main Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#f8d7da">DS 3 — Extensive</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">4.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly submerging the first floor of the prominent white Second Empire-style building to approximately window-sill or mid-window level of the first story, suggesting roughly 4–5 feet of exterior water depth; water appears to extend well into the building interior at this depth, implying damage to all first-floor components including drywall, electrical, and mechanical systems, consistent with damage state 3. The large neoclassical stone building in the background (consistent with the Vermont State House area or a civic building) also shows significant inundation.</span></td>
+  <td data-col="10"><span class="long">Aerial oblique angle prevents confirmation of address signage or interior conditions; building identification is based on architectural style and context typical of downtown Montpelier July 2023 flooding; upper-story interior damage cannot be confirmed from exterior view; water line on exterior walls partially obscured by trees.</span></td>
+  <td data-col="11">135 Main St Montpelier VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fff3cd" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222030.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222030.png</span></td>
+  <td data-col="2">Chase Bank / mixed commercial block</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#fff3cd">DS 1 — Minor</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">0.3 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visible across the street and sidewalk at ankle-to-shin depth (roughly 6–12 inches at street level), with water pooling at building entrances and storefronts on the right; the water line appears to be at or just below the threshold of ground-floor entries, suggesting potential minor interior water intrusion consistent with DS1. A Chase Bank sign is visible mid-frame and signage partially reading 'STATES PO[ST]' (likely a US Post Office) is visible on the brick building at left.</span></td>
+  <td data-col="10"><span class="long">Exterior-only view during active flooding; interior damage cannot be confirmed. Water depth estimated from person's ankle-level immersion. Location appears to be a New York or New Jersey commercial main street, not Montpelier VT — address assignment to Montpelier is not appropriate. No visible water staining on upper walls to confirm interior entry. Receding or rising water status unknown.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f8d7da" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222143.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222143.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#f8d7da">DS 3 — Extensive</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">5.0 ft</td>
+  <td data-col="7">aerial_overview</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">Aerial overview of a densely flooded urban neighborhood in what appears to be Montpelier VT (July 2023 flooding); water levels are at or above first-floor windows on multiple structures, with at least one car nearly fully submerged, indicating exterior water depths of approximately 4–6 feet. The brick multi-story building on the left shows water reaching well up its first-floor facade, consistent with extensive damage to non-structural interior components throughout the first floor and potentially into upper stories.</span></td>
+  <td data-col="10"><span class="long">This is a wide aerial overview with no single clearly identified subject building; no readable signage or address numbers are visible. Water depth estimates are approximations based on vehicle and building proportions. Interior damage cannot be directly observed; assessment is inferred from exterior water line relative to building heights.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222211.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222211.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">State Street / Main Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">aerial_overview</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">This is a wide-angle aerial drone image of downtown Montpelier VT during active flooding, showing the entire city center inundated with brown floodwater reaching at least mid-first-floor level on most commercial brick buildings along what appears to be State Street and Main Street; no single building is the clear subject of the frame.</span></td>
+  <td data-col="10"><span class="long">Pure aerial overview — no individual building can be isolated for a reliable damage state assignment; water depth estimate is approximated from comparison of water surface to visible street furniture (lamp posts, fire hydrants) and first-floor window heights; interior conditions, structural integrity, and upper-floor status are entirely unknown from this vantage point.</span></td>
+  <td data-col="11">2 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222229.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222229.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">Main Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">4.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly inundating the first-floor storefronts and commercial spaces of multiple downtown brick buildings, with water depth appearing to reach approximately mid-first-floor level (roughly 4–5 ft above street grade), consistent with damage to base electrical, HVAC, water heater, lower cabinets, and first-floor contents. The submerged fire hydrant in the background confirms substantial street-level depth.</span></td>
+  <td data-col="10"><span class="long">Aerial/oblique angle from bridge limits interior assessment; only exterior flood depth can be estimated; multiple buildings are visible but no single structure is the exclusive focus; no readable signage to confirm exact address; structural damage cannot be confirmed from this vantage point.</span></td>
+  <td data-col="11">2 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222243.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222243.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">Main Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">aerial_overview</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long">This is an aerial overview of downtown Montpelier VT during the July 2023 flood, showing the Vermont State House dome (upper right) and the Winooski River overflowing across Main Street and surrounding blocks. Floodwater is visibly inundating streets and reaching first-floor elevations of most commercial brick buildings, estimated at 3–4 feet deep in streets based on vehicle/street furniture reference points. No single building is the clear subject of assessment.</span></td>
+  <td data-col="10"><span class="long">Pure aerial overview covering multiple city blocks; no individual building can be isolated for a reliable damage-state rating. Water depth estimate is approximate from oblique aerial perspective. Interior conditions, basement flooding, and upper-story damage are not visible. The clock tower building (likely the Blanchard Block area) and surrounding Main Street commercial blocks appear to have water at or above first-floor threshold, suggesting DS 2–3 for most structures, but this cannot be confirmed without ground-level imagery.</span></td>
+  <td data-col="11">2 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222257.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222257.png</span></td>
+  <td data-col="2">Langdon Street / Main Street commercial block (likely including Thrush Tavern / Inn at Montpelier area)</td>
+  <td data-col="3">Main Street and Langdon Street, Montpelier, VT 05602</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is actively inundating the street at an estimated 3–4 ft depth at the building exteriors, reaching well above the curb and into ground-floor storefronts; water appears to be at or above the bottom of first-floor windows on the lower annex structure, indicating first-floor interior flooding consistent with moderate damage (drywall, appliances, flooring, lower cabinets at risk). The large multi-story brick mill-style building in the background shows water at approximately mid-first-floor level.</span></td>
+  <td data-col="10"><span class="long">Exterior assessment only during active flooding; interior damage not visible. Water depth estimated relative to street furniture, door heights, and tree bases. The clock tower in the background is consistent with the Washington County Courthouse area of downtown Montpelier. Multiple buildings are visible but no readable signage to confirm exact addresses. Actual damage state may be higher (3) if water entered upper portions of first-floor commercial spaces.</span></td>
+  <td data-col="11">4 Langdon St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f8d7da" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222315.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222315.png</span></td>
+  <td data-col="2">Washington County Courthouse / Vermont State Office Complex</td>
+  <td data-col="3">65 State Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#f8d7da">DS 3 — Extensive</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">4.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at or above the first-floor slab/garage level of the large gray government building (consistent with the Washington County Courthouse complex), with water appearing to reach approximately 4–5 feet at the exterior; the adjacent brick building shows water reaching well above its base, submerging ground-floor windows, indicating extensive interior damage to first-floor mechanical, electrical, and finish systems throughout the visible structures.</span></td>
+  <td data-col="10"><span class="long">Exterior-only assessment during active flood; actual interior water depth may differ from exterior reading; upper floors not assessable from this angle; the gray building's raised garage/podium level may have partially mitigated entry into upper occupied floors; building identification based on architectural recognition of Montpelier civic core, not visible signage.</span></td>
+  <td data-col="11">65 State St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/Screenshot%202026-02-19%20222354.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">Screenshot 2026-02-19 222354.png</span></td>
+  <td data-col="2">Montpelier Fire Department</td>
+  <td data-col="3">39 Main Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">1.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Signage clearly reads 'Montpelier Fire Department'; floodwater is visible inundating the street and approaching the building's first-floor entrance, with water depth estimated at approximately 1.5 ft at the building exterior based on submersion of the lower ramp/barrier infrastructure and reflection in still standing water. The concrete flood barrier/gate at the apparatus bay entrance appears partially engaged but water has reached or entered the ground floor level.</span></td>
+  <td data-col="10"><span class="long">Exterior-only assessment; interior damage cannot be confirmed. Water level at the building face is partially obscured by the flood barrier equipment. The apparatus bay doors and lower ramp area may have provided some protection, reducing actual interior inundation. No high-water marks visible on the brick to confirm interior penetration depth. Damage state could be 1 if flood barriers were effective.</span></td>
+  <td data-col="11">2 Main St, Montpelier, VT 05602</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/State%20ST.avif" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">State ST.avif</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">—</td>
+  <td data-col="7">—</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long"></span></td>
+  <td data-col="10"><span class="long"></span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model"></span></td>
+</tr><tr class="data-row" data-ds-color="#f0f0f0" data-cf-color="#f8d7da">
+  <td data-col="0"><img src="Image%20gallery/State%20St%202.png" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">State St 2.png</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">—</td>
+  <td data-col="4"><span class="pill" style="background:#f0f0f0">Not assessable</span></td>
+  <td data-col="5"><span class="pill" style="background:#f8d7da">low</span></td>
+  <td data-col="6">—</td>
+  <td data-col="7">—</td>
+  <td data-col="8">No</td>
+  <td data-col="9"><span class="long"></span></td>
+  <td data-col="10"><span class="long"></span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model"></span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/main%20st%205.jpg" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">main st 5.jpg</span></td>
+  <td data-col="2">Aubuchon Paint Center / True Value Hardware Block</td>
+  <td data-col="3">4-8 Langdon Street or Main Street, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">2.0 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Floodwater is visibly at approximately 2 feet deep at the storefronts, with water clearly entering or at the threshold of the Aubuchon Paint Center and adjacent hardware store; standing water reaches well above curb level and submerges sidewalk furniture and signage, indicating water has entered first-floor commercial spaces and likely damaged flooring, lower cabinetry, base electrical, and ground-floor inventory.</span></td>
+  <td data-col="10"><span class="long">Assessment is exterior-only and taken during active flooding at dusk, limiting visibility of interior damage extent; exact water ingress depth inside buildings cannot be confirmed; upper stories appear undamaged; final damage state could range from 1 to 3 depending on interior water penetration depth and duration.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr><tr class="data-row" data-ds-color="#fde8c8" data-cf-color="#fff3cd">
+  <td data-col="0"><img src="Image%20gallery/montpelier-usa-11th-july-2023-view-of-downtown-during-flooding-from-the-winooskis-river-that-inundated-montpelier-vt-usa-capital-of-vermont-11-july-23-credit-john-lazenbyalamy-live-news-2RBXHP0.jpg" class="thumb" alt=""></td>
+  <td data-col="1"><span class="fname">montpelier-usa-11th-july-2023-view-of-downtown-during-flooding-from-the-winooskis-river-that-inundated-montpelier-vt-usa-capital-of-vermont-11-july-23-credit-john-lazenbyalamy-live-news-2RBXHP0.jpg</span></td>
+  <td data-col="2">—</td>
+  <td data-col="3">Main Street / State Street area, Montpelier, VT</td>
+  <td data-col="4"><span class="pill" style="background:#fde8c8">DS 2 — Moderate</span></td>
+  <td data-col="5"><span class="pill" style="background:#fff3cd">medium</span></td>
+  <td data-col="6">3.5 ft</td>
+  <td data-col="7">during_flood</td>
+  <td data-col="8">Yes</td>
+  <td data-col="9"><span class="long">Aerial view shows deeply flooded streets with murky brown floodwater reaching approximately window-sill level on first floors of the prominent white two-story residential/mixed-use building at left and surrounding structures; water depth at street level appears to be roughly 3–4 feet, consistent with partial first-floor inundation sufficient to damage drywall, lower electrical, flooring, and appliances. Street signs are partially submerged, confirming significant depth.</span></td>
+  <td data-col="10"><span class="long">Oblique aerial angle prevents assessment of interior damage or water line staining on building exteriors; actual first-floor elevation above street grade is unknown and could reduce or increase interior water intrusion; multiple buildings are visible but no single structure is definitively the focal subject; no readable address numbers or signage confirmed.</span></td>
+  <td data-col="11">—</td>
+  <td data-col="12"><span class="model">claude-sonnet-4-6</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<script>
+const DS_LEGEND = [
+  ["#d4edda","DS 0 — None"],["#fff3cd","DS 1 — Minor"],["#fde8c8","DS 2 — Moderate"],
+  ["#f8d7da","DS 3 — Extensive"],["#f5c6cb","DS 4 — Complete"],["#f0f0f0","Not assessable"]
+];
+const CF_LEGEND = [["#d4edda","High"],["#fff3cd","Medium"],["#f8d7da","Low"]];
+
+let currentMode = 'none';
+
+function setMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.data-row').forEach(row => {
+    row.style.background = mode === 'ds' ? row.dataset.dsColor
+                         : mode === 'cf' ? row.dataset.cfColor : '';
+  });
+  const el = document.getElementById('legend');
+  if (mode === 'none') { el.style.display = 'none'; return; }
+  const items = mode === 'ds' ? DS_LEGEND : CF_LEGEND;
+  el.innerHTML = items.map(([c,l]) =>
+    `<div class="legend-item"><div class="swatch" style="background:${c}"></div>${l}</div>`
+  ).join('');
+  el.style.display = 'flex';
+}
+
+function toggleCol(idx, visible) {
+  document.querySelectorAll(`[data-col="${idx}"]`).forEach(el => {
+    el.style.display = visible ? '' : 'none';
+  });
+}
+
+function filterRows() {
+  const q = document.getElementById('filter').value.toLowerCase();
+  document.querySelectorAll('.data-row').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// Apply default hidden columns on load
+  toggleCol(1, false);
+  toggleCol(2, false);
+  toggleCol(5, false);
+  toggleCol(7, false);
+  toggleCol(11, false);
+  toggleCol(12, false);
+</script>
+</body>
+</html>

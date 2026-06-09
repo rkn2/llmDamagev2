@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 assess_damage.py — Flood damage image assessment pipeline
 
@@ -28,6 +29,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 import anthropic
+from anthropic import AnthropicVertex
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -38,6 +40,8 @@ EXCEL_PATH = BASE_DIR / "Montpelier_Flood_DataInput.xlsx"
 
 # ── API config ─────────────────────────────────────────────────────────────────
 DEFAULT_MODEL = "claude-sonnet-4-6"
+VERTEX_PROJECT  = os.environ.get("ANTHROPIC_VERTEX_PROJECT_ID", "up-ems-hdr-dsc")
+VERTEX_REGION   = os.environ.get("CLOUD_ML_REGION", "us-east5")
 
 # ── Image format support ───────────────────────────────────────────────────────
 MEDIA_TYPES = {
@@ -310,16 +314,13 @@ def main():
     parser.add_argument("--image", default=None, help="Assess a single image by filename")
     args = parser.parse_args()
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        sys.exit("Error: ANTHROPIC_API_KEY environment variable not set.")
-
     images = collect_images(args.single if hasattr(args, "single") else args.image)
     print(f"Images to process: {len(images)}")
     print(f"Model: {args.model}")
+    print(f"Vertex project: {VERTEX_PROJECT} / {VERTEX_REGION}")
     print(f"Excel: {EXCEL_PATH.name}\n")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = AnthropicVertex(project_id=VERTEX_PROJECT, region=VERTEX_REGION)
 
     wb = openpyxl.load_workbook(EXCEL_PATH)
     ws_buildings = wb["BuidlingAttributes"]
